@@ -40,6 +40,7 @@ class NRDB:
         cur = self.con.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS cards(id, name, type, faction, keywords, pack)")
         cur.execute("CREATE TABLE IF NOT EXISTS decklists(id, name, cards_json)")
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_cards ON cards(id)")
 
     def get_card_api(self, id):
         url = f'https://netrunnerdb.com/api/2.0/public/card/{id:05}'
