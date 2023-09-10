@@ -38,17 +38,31 @@ class Tournament:
             print(response['warn'])
             return
          
-        data = []
+        cur = self.__abr.con.cursor()
+        insert = []
+        update = []
         for entry in response:
+            rank_swiss = entry['rank_swiss']
             rank_top = entry['rank_top'] if entry['rank_top'] else None
             corp_deck = Tournament.get_deck_id_from_url(entry['corp_deck_url'])
             runner_deck = Tournament.get_deck_id_from_url(entry['runner_deck_url'])
             user_name = entry['user_name'] if entry['user_name'] else entry['user_import_name']
-            data.append((int(self.id), entry['rank_swiss'], rank_top, user_name, int(entry['corp_deck_identity_id']), corp_deck, int(entry['runner_deck_identity_id']), runner_deck))
-
-        cur = self.__abr.con.cursor()
-        cur.execute(f"DELETE FROM tournament_entries WHERE tournament_id = {self.id}")
-        cur.executemany("INSERT INTO tournament_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?)", data)
+            corp_id = int(entry['corp_deck_identity_id'])
+            runner_id = int(entry['runner_deck_identity_id'])
+            old_data = cur.execute(f"SELECT user_name, corp_id, corp_deck, runner_id, runner_deck FROM tournament_entries WHERE tournament_id = ? AND rank_swiss = ?", (self.id, rank_swiss)).fetchall()
+            if old_data:
+                if old_data[0] != (user_name, corp_id, corp_deck, runner_id, runner_deck):
+                    update.append((user_name, corp_id, corp_deck, runner_id, runner_deck, int(self.id), rank_swiss))
+            else:
+                insert.append((int(self.id), rank_swiss, rank_top, user_name, corp_id, corp_deck, runner_id, runner_deck))
+        
+        if len(insert) > 0:
+            cur.executemany("INSERT INTO tournament_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?)", insert)
+        if len(update) > 0:
+            cur.executemany("UPDATE tournament_entries SET user_name = ?, corp_id = ?, corp_deck = ?, runner_id = ?, runner_deck = ? WHERE tournament_id = ? AND rank_swiss = ?", update)
+        now = int(time.time())
+        if len(insert) > 0 or len(update) > 0:
+            cur.execute("UPDATE tournaments SET updated_at = ? WHERE id = ?", (now, self.id))
         self.__abr.con.commit()
 
     def __entries(self, top_cut_only):
