@@ -117,9 +117,13 @@ class ABR:
             if not tournament['concluded']:
                 continue
             tournament_id = int(tournament['id'])
+
             if cur.execute(f"SELECT id FROM tournaments WHERE id = {tournament_id}").fetchall():
                 continue
             insert.append((tournament_id, tournament['title'], tournament['format'], tournament['cardpool'], tournament['mwl'], now))
+
+            if tournament['matchdata']:
+                cached_request(f'https://alwaysberunning.net/tjsons/{tournament_id}.json', f'matchdata/{tournament_id}')
 
         cur.executemany("INSERT INTO tournaments VALUES (?, ?, ?, ?, ?, ?)", insert)
         self.con.commit()
