@@ -49,7 +49,7 @@ class Tournament:
             user_name = entry['user_name'] if entry['user_name'] else entry['user_import_name']
             corp_id = int(entry['corp_deck_identity_id'])
             runner_id = int(entry['runner_deck_identity_id'])
-            old_data = cur.execute(f"SELECT user_name, corp_id, corp_deck, runner_id, runner_deck FROM tournament_entries WHERE tournament_id = ? AND rank_swiss = ?", (self.id, rank_swiss)).fetchall()
+            old_data = cur.execute("SELECT user_name, corp_id, corp_deck, runner_id, runner_deck FROM tournament_entries WHERE tournament_id = ? AND rank_swiss = ?", (self.id, rank_swiss)).fetchall()
             if old_data:
                 if old_data[0] != (user_name, corp_id, corp_deck, runner_id, runner_deck):
                     update.append((user_name, corp_id, corp_deck, runner_id, runner_deck, int(self.id), rank_swiss))
@@ -61,8 +61,7 @@ class Tournament:
         if len(update) > 0:
             cur.executemany("UPDATE tournament_entries SET user_name = ?, corp_id = ?, corp_deck = ?, runner_id = ?, runner_deck = ? WHERE tournament_id = ? AND rank_swiss = ?", update)
         now = int(time.time())
-        if len(insert) > 0 or len(update) > 0:
-            cur.execute("UPDATE tournaments SET updated_at = ? WHERE id = ?", (now, self.id))
+        cur.execute("UPDATE tournaments SET updated_at = ? WHERE id = ?", (now, self.id))
         self.__abr.con.commit()
 
     def __entries(self, top_cut_only):
@@ -107,30 +106,36 @@ class ABR:
         cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tournament_entries ON tournament_entries(tournament_id, rank_swiss)")
 
     def get_tournaments_api(self, cardpool):
-        url = f'https://alwaysberunning.net/api/tournaments?cardpool={cardpool}'
+        url = f'https://alwaysberunning.net/api/tournaments?cardpool={cardpool}&limit=100'
         response = cached_request(url)
+        
+        cur = self.con.cursor()
 
-        data = []
+        insert = []
         now = int(time.time())
         for tournament in response:
-            entry = {} 
-            entry['id'] = tournament['id']
-            entry['name'] = tournament['title']
-            entry['format'] = tournament['format']
-            entry['cardpool'] = tournament['cardpool']
-            entry['banlist'] = tournament['mwl']
-            data.append((int(entry['id']), entry['name'], entry['format'], entry['cardpool'], entry['banlist'], now))
+            if not tournament['concluded']:
+                continue
+            tournament_id = int(tournament['id'])
+            if cur.execute(f"SELECT id FROM tournaments WHERE id = {tournament_id}").fetchall():
+                continue
+            insert.append((tournament_id, tournament['title'], tournament['format'], tournament['cardpool'], tournament['mwl'], now))
 
-        cur = self.con.cursor()
-        cur.executemany("INSERT INTO tournaments VALUES (?, ?, ?, ?, ?, ?)", data)
+        cur.executemany("INSERT INTO tournaments VALUES (?, ?, ?, ?, ?, ?)", insert)
         self.con.commit()
 
     def get_tournaments(self, cardpool):
         cur = self.con.cursor()
         res = cur.execute("SELECT id, name, updated_at FROM tournaments WHERE format = 'standard'")
         ret = []
+        now = int(time.time())
+        ttl = 24 * 3600
         for (id, name, updated_at) in res:
-            ret.append(Tournament(self, id, name))
+            t = Tournament(self, id, name)
+            if now - updated_at > ttl:
+                print(f"Updating entries for {name}...")
+                t.get_entries_api()
+            ret.append(t)
         return ret
 
 

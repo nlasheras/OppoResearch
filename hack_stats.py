@@ -6,6 +6,7 @@ from nrdb import NRDB
 cardpool = 'tai'
 
 abr = ABR()
+abr.get_tournaments_api('tai') # force a get from API
 tournaments = abr.get_tournaments('tai') # from DB
 
 card_ids = defaultdict(int)
@@ -13,11 +14,7 @@ corp_ids = defaultdict(int)
 runner_ids = defaultdict(int)
 
 for tournament in tournaments:
-    #print(tournament)
-    #tournament.get_entries_api()
-
     for entry in tournament.all_entries():
-        #print(entry)
         corp_ids[entry.corp_id.id] += 1
         runner_ids[entry.runner_id.id] += 1
 
