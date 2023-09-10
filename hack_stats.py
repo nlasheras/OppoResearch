@@ -69,4 +69,13 @@ for code in sorted_cycles:
     #for (name, count) in cards:
     #    print(f'{name},{count}')
 
-    
+used_ice = defaultdict(int)
+for id in card_ids: 
+    card = nrdb.get_card(id)
+    if card.type == 'ice':
+        used_ice[id] += card_ids[id]
+
+for id in sorted(used_ice.keys(), key=lambda k: used_ice[k], reverse=True):
+    card = nrdb.get_card(id)
+    print(f'{card.name},{card.keywords},{used_ice[id]}')
+
