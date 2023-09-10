@@ -1,6 +1,7 @@
 from requests import cached_request
 import sqlite3
 import time
+from nrdb import NRDB
 
 class TournamentEntry:
     def __init__(self, parent):
@@ -53,8 +54,8 @@ class Tournament:
             entry = TournamentEntry(self)
             entry.rank_swiss = rank_swiss
             entry.rank_top = rank_top
-            entry.corp_id = corp_id
-            entry.runner_id = runner_id
+            entry.corp_id = self.__abr.nrdb.get_card(corp_id)
+            entry.runner_id = self.__abr.nrdb.get_card(runner_id)
             entry.corp_deck = corp_deck
             entry.runner_deck = runner_deck
             ret.append(entry)
@@ -63,6 +64,7 @@ class Tournament:
 
 class ABR:
     def __init__(self):
+        self.nrdb = NRDB()
         self.con = sqlite3.connect("abr.db")
         self.__create_db()
         pass
