@@ -4,7 +4,6 @@ from abr import ABR
 from nrdb import NRDB
 
 cardpool = 'tai'
-tournament_list = f'https://alwaysberunning.net/api/tournaments?cardpool={cardpool}'
 
 abr = ABR()
 tournaments = abr.get_tournaments('tai') # from DB
