@@ -32,8 +32,12 @@ class Tournament:
 
     def get_entries_api(self):
         url = f'https://alwaysberunning.net/api/entries?id={self.id}'
-        response = cached_request(url)
+        response = cached_request(url, f"tournament/{self.id}")
         
+        if 'warn' in response:
+            print(response['warn'])
+            return
+         
         data = []
         for entry in response:
             rank_top = entry['rank_top'] if entry['rank_top'] else 0
@@ -46,20 +50,33 @@ class Tournament:
         cur.executemany("INSERT INTO tournament_entries VALUES (?, ?, ?, ?, ?, ?, ?)", data)
         self.__abr.con.commit()
 
-    def top_cut(self):
+    def __entries(self, top_cut_only):
         cur = self.__abr.con.cursor()
-        res = cur.execute(f"SELECT rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck FROM tournament_entries WHERE tournament_id = {self.id} AND rank_top != 0")
+        query = f"SELECT rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck FROM tournament_entries WHERE tournament_id = {self.id}"
+        if (top_cut_only):
+            query += " AND rank_top != 0"
+        res = cur.execute(query)
         ret = []
         for (rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck) in res:
             entry = TournamentEntry(self)
             entry.rank_swiss = rank_swiss
             entry.rank_top = rank_top
             entry.corp_id = self.__abr.nrdb.get_card(corp_id)
-            entry.runner_id = self.__abr.nrdb.get_card(runner_id)
-            entry.corp_deck = corp_deck
-            entry.runner_deck = runner_deck
+            entry.runner_id = self.__abr.nrdb.get_card(runner_id) 
+            entry.corp_deck = self.__abr.nrdb.get_decklist(corp_deck) if corp_deck else None
+            entry.runner_deck = self.__abr.nrdb.get_decklist(runner_deck) if runner_deck else None
             ret.append(entry)
         ret.sort(key=lambda entry: entry.rank_top)
+        return ret
+    
+    def top_cut(self):
+        ret = self.__entries(True)
+        ret.sort(key=lambda entry: entry.rank_top)
+        return ret
+        
+    def all_entries(self):
+        ret = self.__entries(False)
+        ret.sort(key=lambda entry: entry.rank_swiss)
         return ret
 
 class ABR:

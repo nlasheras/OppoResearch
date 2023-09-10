@@ -14,9 +14,9 @@ def cached_request(url, cache = None):
     response = urlopen(url)
     data = json.loads(response.read())
     if cache:
-        cache_path = "/".join(cache.split("/")[:-1])
-        if not path.exists(cache_path):
-            os.makedirs(cache_path)
+        cache_path = cache.split("/")[:-1][0]
+        if not path.exists(f"cached_requests/{cache_path}"):
+            os.makedirs(f"cached_requests/{cache_path}")
         with open(filename, "w") as f:
             json.dump(data, f)
     time.sleep(time_between_requests)

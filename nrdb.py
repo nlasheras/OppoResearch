@@ -27,7 +27,7 @@ class Decklist:
             if card.type == 'identity':
                 self.card_id = card
             else:
-                self.cards += (card, card_data[card_id])
+                self.cards += [(card, card_data[card_id])]
 
    
 class NRDB:
@@ -38,11 +38,11 @@ class NRDB:
 
     def __create_db(self):
         cur = self.con.cursor()
-        cur.execute("CREATE TABLE IF NOT EXISTS cards(id, name, type, faction, keywords)")
+        cur.execute("CREATE TABLE IF NOT EXISTS cards(id, name, type, faction, keywords, pack)")
         cur.execute("CREATE TABLE IF NOT EXISTS decklists(id, name, cards_json)")
 
     def get_card_api(self, id):
-        url = f'https://netrunnerdb.com/api/2.0/public/card/{id}'
+        url = f'https://netrunnerdb.com/api/2.0/public/card/{id:05}'
         response = cached_request(url, f"cards/{id}")
 
         data = []
@@ -52,10 +52,11 @@ class NRDB:
             type = card_data['type_code']
             faction = card_data['faction_code']
             keywords = card_data['keywords'] if 'keywords' in card_data else None
-            data.append((id, name, type, faction, keywords))
+            pack = card_data['pack_code']
+            data.append((id, name, type, faction, keywords, pack))
 
         cur = self.con.cursor()
-        cur.executemany("INSERT INTO cards VALUES (?, ?, ?, ?, ?)", data)
+        cur.executemany("INSERT INTO cards VALUES (?, ?, ?, ?, ?, ?)", data)
         self.con.commit()
         
         c = Card(id, name)
@@ -66,7 +67,7 @@ class NRDB:
     
     def get_card(self, id):
         cur = self.con.cursor()
-        res = cur.execute(f"SELECT name, type, faction, keywords FROM cards WHERE id = {id}")
+        res = cur.execute(f"SELECT name, type, faction, keywords, pack FROM cards WHERE id = {id}")
         rows = res.fetchall()
         if rows:
             data = rows[0]
@@ -74,6 +75,7 @@ class NRDB:
             c.type = data[1]
             c.faction = data[2]
             c.keywords = data[3]
+            c.pack = data[4]
             return c
         return self.get_card_api(id)
     

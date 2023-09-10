@@ -1,87 +1,73 @@
 from collections import defaultdict
 from requests import cached_request
+from abr import ABR
+from nrdb import NRDB
 
-cardpool = 'ms'
-tournament_list = f'https://alwaysberunning.net/api/tournaments?cardpool={cardpool}&type=4'
+cardpool = 'tai'
+tournament_list = f'https://alwaysberunning.net/api/tournaments?cardpool={cardpool}'
 
-tournaments_json = cached_request(tournament_list)
+abr = ABR()
+tournaments = abr.get_tournaments('tai') # from DB
 
 card_ids = defaultdict(int)
 corp_ids = defaultdict(int)
 runner_ids = defaultdict(int)
 
-tournament_entries = "https://alwaysberunning.net/api/entries?id="
-for tournament in tournaments_json:
-    tournament_id = tournament['id']
-    print(tournament['title'])
+for tournament in tournaments:
+    #print(tournament)
+    #tournament.get_entries_api()
 
-    url = tournament_entries + str(tournament_id)
+    for entry in tournament.all_entries():
+        #print(entry)
+        corp_ids[entry.corp_id.id] += 1
+        runner_ids[entry.runner_id.id] += 1
 
-    entries_json = cached_request(url)
-
-    decklist_url = "https://netrunnerdb.com/api/2.0/public/decklist/"
-    def fetch_cards(url):
-        print(url)
-        deck_id = url.split("/")[-1]
-        deck_json = cached_request(decklist_url + deck_id, f"decks/{deck_id}")
-        deck_cards = deck_json['data'][0]['cards']
-        for id in deck_cards.keys():
-            card_ids[id] += 1
-
-    for entry in entries_json:
-        
-        rank_top = entry['rank_top']
-        if not rank_top:
-            continue
-
-        corp_id = entry['corp_deck_identity_id']
-        corp_ids[corp_id] += 1
-        corp_id = entry['runner_deck_identity_id']
-        runner_ids[corp_id] += 1
-
-        corp_url = entry['corp_deck_url']
-        if corp_url:
-            fetch_cards(corp_url)
-
-        runner_url = entry['runner_deck_url']
-        if runner_url:
-            fetch_cards(runner_url)
-        
+        def count_cards(deck):
+            for pair in deck.cards:
+                card_ids[pair[0].id] += 1    
+            
+        if entry.corp_deck:
+            count_cards(entry.corp_deck)
+        if entry.runner_deck:
+            count_cards(entry.runner_deck)
 
 
-card_url = 'https://netrunnerdb.com/api/2.0/public/card/'
 
-for id in corp_ids:
-    card_json = cached_request(card_url + id, f"cards/{id}")
-    name = card_json['data'][0]['title']
+nrdb = NRDB()
+print("*** Used Corp IDs")
+for id in sorted(corp_ids, key = lambda id: corp_ids[id], reverse = True):
+    name = nrdb.get_card(id).name
     print(f'{name} {corp_ids[id]}')
-for id in runner_ids:
-    card_json = cached_request(card_url + id, f"cards/{id}")
-    name = card_json['data'][0]['title']
+print("*** Used Runner IDs")
+for id in sorted(runner_ids, key = lambda id: runner_ids[id], reverse = True):
+    name = nrdb.get_card(id).name
     print(f'{name} {runner_ids[id]}')
 
+print("*** Check pack and cycle usage")
 packs = defaultdict(lambda: defaultdict(int))
 for id in card_ids: 
-    card_json = cached_request(card_url + id, f"cards/{id}")
-    pack_code = card_json['data'][0]['pack_code']
-    name = card_json['data'][0]['title']
-    packs[pack_code][name] += card_ids[id]
+    card = nrdb.get_card(id)
+    packs[card.pack][card.name] += card_ids[id]
 
 cycles = defaultdict(lambda: defaultdict(int))
+cycles_size = defaultdict(int)
 pack_url = 'https://netrunnerdb.com/api/2.0/public/pack/'
 for code in packs:
     pack_json = cached_request(pack_url + code, f"packs/{code}")
     cycle_code = pack_json['data'][0]['cycle_code']
+    pack_size = pack_json['data'][0]['size']
+    cycles_size[cycle_code] += pack_size
     for name in packs[code]:
         cycles[cycle_code][name] += packs[code][name]
 
-for code in cycles:
+print("*** RESULTS ***")
+sorted_cycles = sorted(cycles.keys(), key=lambda k: len(cycles[k]) / cycles_size[k], reverse=True)
+for code in sorted_cycles:
     cycle_cards = cycles[code]
-    print(f"*******{code} {len(cycle_cards)}")
-    cards = list(map(lambda name: (name, cycle_cards[name]), cycle_cards))
-    cards.sort(reverse = True, key = lambda x: x[1])
-    for (name, count) in cards:
-        print(f'{name} {count}')
-    print("*******")
+    print(f"{code} {len(cycle_cards)}/{cycles_size[code]}")
+    #cards = list(map(lambda name: (name, cycle_cards[name]), cycle_cards))
+    #cards.sort(reverse = True, key = lambda x: x[1])
+    #for (name, count) in cards:
+    #    print(f'{name},{count}')
 
     
