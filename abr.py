@@ -40,21 +40,22 @@ class Tournament:
          
         data = []
         for entry in response:
-            rank_top = entry['rank_top'] if entry['rank_top'] else 0
+            rank_top = entry['rank_top'] if entry['rank_top'] else None
             corp_deck = Tournament.get_deck_id_from_url(entry['corp_deck_url'])
             runner_deck = Tournament.get_deck_id_from_url(entry['runner_deck_url'])
-            data.append((int(self.id), entry['rank_swiss'], rank_top, int(entry['corp_deck_identity_id']), corp_deck, int(entry['runner_deck_identity_id']), runner_deck))
+            user_name = entry['user_name'] if entry['user_name'] else entry['user_import_name']
+            data.append((int(self.id), entry['rank_swiss'], rank_top, user_name, int(entry['corp_deck_identity_id']), corp_deck, int(entry['runner_deck_identity_id']), runner_deck))
 
         cur = self.__abr.con.cursor()
         cur.execute(f"DELETE FROM tournament_entries WHERE tournament_id = {self.id}")
-        cur.executemany("INSERT INTO tournament_entries VALUES (?, ?, ?, ?, ?, ?, ?)", data)
+        cur.executemany("INSERT INTO tournament_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?)", data)
         self.__abr.con.commit()
 
     def __entries(self, top_cut_only):
         cur = self.__abr.con.cursor()
         query = f"SELECT rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck FROM tournament_entries WHERE tournament_id = {self.id}"
         if (top_cut_only):
-            query += " AND rank_top != 0"
+            query += " AND rank_top IS NOT NULL"
         res = cur.execute(query)
         ret = []
         for (rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck) in res:
@@ -66,7 +67,6 @@ class Tournament:
             entry.corp_deck = self.__abr.nrdb.get_decklist(corp_deck) if corp_deck else None
             entry.runner_deck = self.__abr.nrdb.get_decklist(runner_deck) if runner_deck else None
             ret.append(entry)
-        ret.sort(key=lambda entry: entry.rank_top)
         return ret
     
     def top_cut(self):
@@ -89,7 +89,8 @@ class ABR:
     def __create_db(self):
         cur = self.con.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS tournaments(id, name, format, cardpool, banlist, updated_at)")
-        cur.execute("CREATE TABLE IF NOT EXISTS tournament_entries(tournament_id, rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck)")
+        cur.execute("CREATE TABLE IF NOT EXISTS tournament_entries(tournament_id, rank_swiss, rank_top, user_name, corp_id, corp_deck, runner_id, runner_deck)")
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tournament_entries ON tournament_entries(tournament_id, rank_swiss)")
 
     def get_tournaments_api(self, cardpool):
         url = f'https://alwaysberunning.net/api/tournaments?cardpool={cardpool}'
