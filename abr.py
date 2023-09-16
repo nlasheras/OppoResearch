@@ -6,6 +6,7 @@ from nrdb import NRDB
 class TournamentEntry:
     def __init__(self, parent):
         self.__tournament = parent
+        self.user_name = ""
         self.rank_swiss = 0
         self.rank_top = 0
         self.corp_id = 0
@@ -14,7 +15,7 @@ class TournamentEntry:
         self.runner_deck = None
     
     def __repr__(self):
-        return f"ABR.TournamentEntry({self.rank_swiss}, {self.rank_top})"
+        return f"ABR.TournamentEntry({self.rank_swiss}, {self.rank_top}, {self.user_name})"
 
 class Tournament:
     def __init__(self, parent, id, name):
@@ -66,13 +67,14 @@ class Tournament:
 
     def __entries(self, top_cut_only):
         cur = self.__abr.con.cursor()
-        query = f"SELECT rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck FROM tournament_entries WHERE tournament_id = {self.id}"
+        query = f"SELECT user_name, rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck FROM tournament_entries WHERE tournament_id = {self.id}"
         if (top_cut_only):
             query += " AND rank_top IS NOT NULL"
         res = cur.execute(query)
         ret = []
-        for (rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck) in res:
+        for (user_name, rank_swiss, rank_top, corp_id, corp_deck, runner_id, runner_deck) in res:
             entry = TournamentEntry(self)
+            entry.user_name = user_name
             entry.rank_swiss = rank_swiss
             entry.rank_top = rank_top
             entry.corp_id = self.__abr.nrdb.get_card(corp_id)
@@ -90,8 +92,9 @@ class Tournament:
     def all_entries(self):
         ret = self.__entries(False)
         ret.sort(key=lambda entry: entry.rank_swiss)
-        return ret
+        return ret         
 
+    
 class ABR:
     def __init__(self):
         self.nrdb = NRDB()
@@ -104,6 +107,7 @@ class ABR:
         cur.execute("CREATE TABLE IF NOT EXISTS tournaments(id, name, format, cardpool, banlist, updated_at)")
         cur.execute("CREATE TABLE IF NOT EXISTS tournament_entries(tournament_id, rank_swiss, rank_top, user_name, corp_id, corp_deck, runner_id, runner_deck)")
         cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tournament_entries ON tournament_entries(tournament_id, rank_swiss)")
+        cur.execute("CREATE TABLE IF NOT EXISTS tournament_tables(tournament_id, round, table_idx, rank_swiss1, corp_score1, runner_score1, rank_swiss2, corp_score2, runner_score2, table_type)")
 
     def get_tournaments_api(self, cardpool):
         url = f'https://alwaysberunning.net/api/tournaments?cardpool={cardpool}&limit=100'
@@ -123,14 +127,116 @@ class ABR:
             insert.append((tournament_id, tournament['title'], tournament['format'], tournament['cardpool'], tournament['mwl'], now))
 
             if tournament['matchdata']:
-                cached_request(f'https://alwaysberunning.net/tjsons/{tournament_id}.json', f'matchdata/{tournament_id}')
+                self.get_matchdata_api(tournament_id)
 
         cur.executemany("INSERT INTO tournaments VALUES (?, ?, ?, ?, ?, ?)", insert)
+
+        self.con.commit()
+
+    def __parse_cobra(id, data):
+        player_data = data['players']
+        def rank_swiss_player(id):
+            for p in player_data:
+                if p['id'] == id:
+                    return p['rank']
+            None
+
+        insert = []
+        for (round_idx,round_data) in enumerate(data['rounds']):
+            for (table_idx, table_data) in enumerate(round_data): 
+                if not 'player1' in table_data:
+                    print(f"Wrong format for tourney {id}")
+                    return
+                
+                r1 = rank_swiss_player(table_data['player1']['id'])
+                r2 = rank_swiss_player(table_data['player2']['id'])
+                if r2 is None or r1 is None:
+                    continue # bye
+
+                is_elim = 'eliminationGame' in table_data and table_data['eliminationGame']
+                is_241 = 'twoForOne' in table_data and table_data['twoForOne']
+                table_type = None
+                if 'intentionalDraw' in table_data and table_data['intentionalDraw']:
+                    table_type = 'intentionalDraw'
+                if is_241:
+                    table_type = 'twoForOne'
+                elif is_elim:
+                    table_type = 'eliminationGame'
+
+                corp1_score = 0
+                runner1_score = 0
+                corp2_score = 0
+                runner2_score = 0
+                if is_elim:
+                    win1 = table_data['player1']['winner']
+                    is_corp1 = table_data['player1']['role'] == 'corp'
+                    if win1:
+                        corp1_score = 1 if is_corp1 else 0
+                        runner1_score = 0 if is_corp1 else 1
+                    else:
+                        corp2_score = 0 if is_corp1 else 1
+                        runner2_score = 1 if is_corp1 else 0
+                else:
+                    runner1_score = 1 if table_data['player1']['runnerScore'] > 0 else 0
+                    runner2_score = 1 if table_data['player2']['runnerScore'] > 0 else 0
+                    corp1_score = 1 if table_data['player1']['corpScore'] > 0 else 0
+                    corp2_score = 1 if table_data['player2']['corpScore'] > 0 else 0
+
+                insert.append((id, round_idx, table_idx, r1, corp1_score, runner1_score, r2, corp2_score, runner2_score, table_type))
+        return insert
+
+    def __parse_aesops(id, data):
+        player_data = data['players']
+        def rank_swiss_player(id):
+            for p in player_data:
+                if p['id'] == id:
+                    return p['rank']
+            None
+
+        insert = []
+        for (round_idx,round_data) in enumerate(data['rounds']):
+            for (table_idx, table_data) in enumerate(round_data): 
+                corp = rank_swiss_player(table_data['corpPlayer'])
+                runner = rank_swiss_player(table_data['runnerPlayer'])
+
+                table_type = None
+                if 'winner_id' in table_data:
+                    # old Aesops tournaments have unparseable winner_id
+                    continue 
+
+                if table_type is None:
+                    corp_score = 1 if int(table_data['corpScore']) > 0 else 0
+                    runner_score = 1 if int(table_data['runnerScore']) > 0 else 0
+                else:
+                    continue
+
+                insert.append((id, round_idx, table_idx, corp, corp_score, 0, runner, 0, runner_score, table_type))
+        return insert
+    
+    def get_matchdata_api(self, id):
+        data = cached_request(f'https://alwaysberunning.net/tjsons/{id}.json', f'matchdata/{id}')
+        if data == None:
+            return
+        
+        insert = []
+        uploadedFrom = data['uploadedFrom'] if 'uploadedFrom' in data else None
+        if 'version' in data:
+            uploadedFrom = 'NTRM'
+        
+        if uploadedFrom == 'Cobra' or uploadedFrom == 'NTRM':
+            insert = ABR.__parse_cobra(id, data)
+        elif uploadedFrom == 'AesopsTables':
+            insert = ABR.__parse_aesops(id, data)
+        else:
+            print(f'Data from {uploadedFrom} for {id} not supported')
+
+        cur = self.con.cursor()     
+        cur.executemany("INSERT INTO tournament_tables VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", insert)
         self.con.commit()
 
     def get_tournaments(self, cardpool):
         cur = self.con.cursor()
-        res = cur.execute("SELECT id, name, updated_at FROM tournaments WHERE format = 'standard'")
+        res = cur.execute("SELECT id, name, updated_at FROM tournaments")
         ret = []
         now = int(time.time())
         ttl = 24 * 3600
@@ -144,9 +250,9 @@ class ABR:
 
 
 if __name__ == "__main__":
-    test = ABR()
-    #test.get_tournaments_api('tai')
-    #print(test.get_tournaments('tai'))
-    cascadia = Tournament(test, 3636, '2023 American Conts - Cascadia PNW')
-    #cascadia.get_entries_api()
-    print(cascadia.top_cut())
+    abr = ABR()
+    #abr.get_tournaments_api('tai')
+    ts = abr.get_tournaments('tai')
+    emea = Tournament(abr, 3779, '2023 EMEA Continentals')
+    #emea.get_entries_api()
+    print(emea.top_cut())
