@@ -10,41 +10,41 @@ abr = ABR()
 # TODO fix cardpool in DB
 tournaments = abr.get_tournaments('The Automata Initiative', 'standard') # from DB
 
-card_ids = defaultdict(int)
-corp_ids = defaultdict(int)
-runner_ids = defaultdict(int)
+ids_played = defaultdict(int)
+ids_wins = defaultdict(int)
+cards_played = defaultdict(int)
+cards_wins = defaultdict(int)
 
 for tournament in tournaments:
-    for entry in tournament.all_entries():
-        corp_ids[entry.corp_id.id] += 1
-        runner_ids[entry.runner_id.id] += 1
+    for table in tournament.all_tables():
+        def count_deck(id, deck, score):
+            ids_played[id.id] += 1
+            win = 1 if score > 0 else 0
+            ids_wins[id.id] += win
+        
+            if deck != None:
+                for (card, _) in deck.cards:
+                    cards_played[card.id] += 1
+                    cards_wins[card.id] += win
 
-        def count_cards(deck):
-            for pair in deck.cards:
-                card_ids[pair[0].id] += 1    
-            
-        if entry.corp_deck:
-            count_cards(entry.corp_deck)
-        if entry.runner_deck:
-            count_cards(entry.runner_deck)
-
+        count_deck(table.player1.corp_id, table.player1.corp_deck, table.corp_score1)
+        count_deck(table.player1.runner_id, table.player1.runner_deck, table.runner_score1)
+        count_deck(table.player2.corp_id, table.player2.corp_deck, table.corp_score2)
+        count_deck(table.player2.runner_id, table.player2.runner_deck, table.runner_score2)
 
 
 nrdb = NRDB()
-print("*** Used Corp IDs")
-for id in sorted(corp_ids, key = lambda id: corp_ids[id], reverse = True):
+print("*** Used IDs")
+for id in sorted(ids_played, key = lambda id: ids_played[id], reverse = True):
     name = nrdb.get_card(id).name
-    print(f'{name} {corp_ids[id]}')
-print("*** Used Runner IDs")
-for id in sorted(runner_ids, key = lambda id: runner_ids[id], reverse = True):
-    name = nrdb.get_card(id).name
-    print(f'{name} {runner_ids[id]}')
+    win_rate = int(ids_wins[id] * 100 / ids_played[id])
+    print(f'{name} {ids_played[id]} ({win_rate}%)')
 
 print("*** Check pack and cycle usage")
 packs = defaultdict(lambda: defaultdict(int))
-for id in card_ids: 
+for id in cards_played: 
     card = nrdb.get_card(id)
-    packs[card.pack][card.name] += card_ids[id]
+    packs[card.pack][card.name] += cards_played[id]
 
 cycles = defaultdict(lambda: defaultdict(int))
 cycles_size = defaultdict(int)
@@ -68,12 +68,19 @@ for code in sorted_cycles:
     #    print(f'{name},{count}')
 
 used_ice = defaultdict(int)
-for id in card_ids: 
+ice_keywords = defaultdict(int)
+for id in cards_played: 
     card = nrdb.get_card(id)
     if card.type == 'ice':
-        used_ice[id] += card_ids[id]
+        used_ice[id] += cards_played[id]
+        keywords = card.keywords.split(" - ")
+        for k in keywords:
+            ice_keywords[k] += cards_played[id]
 
 for id in sorted(used_ice.keys(), key=lambda k: used_ice[k], reverse=True):
     card = nrdb.get_card(id)
     print(f'{card.name},{card.keywords},{used_ice[id]}')
+for k in sorted(ice_keywords.keys(), key=lambda k: ice_keywords[k], reverse=True):
+    print(f'{k},{ice_keywords[k]}')
+
 

@@ -17,6 +17,17 @@ class TournamentEntry:
     def __repr__(self):
         return f"ABR.TournamentEntry({self.rank_swiss}, {self.rank_top}, {self.user_name})"
 
+class Table:
+    def __init__(self, parent):
+        self.__tournament = parent
+        self.player1 = None
+        self.player2 = None
+        self.corp_score1 = 0
+        self.runner_score1 = 0
+        self.corp_score2 = 0
+        self.runner_score2 = 0
+        self.table_type = None
+
 class Tournament:
     def __init__(self, parent, id, name):
         self.__abr = parent
@@ -97,6 +108,25 @@ class Tournament:
         ret.sort(key=lambda entry: entry.rank_swiss)
         return ret         
 
+    def all_tables(self):
+        cur = self.__abr.con.cursor()
+        query = f"SELECT round, table_idx, rank_swiss1, corp_score1, runner_score1, rank_swiss2, corp_score2, runner_score2, table_type FROM tournament_tables WHERE tournament_id = {self.id}"
+        entries = self.__entries(False)
+        res = cur.execute(query)
+        ret = []
+        for (round, table_idx, rank_swiss1, corp_score1, runner_score1, rank_swiss2, corp_score2, runner_score2, table_type) in res:
+            if rank_swiss1 == None or rank_swiss2 == None:
+                continue
+            entry = Table(self)
+            entry.player1 = entries[rank_swiss1-1]
+            entry.player2 = entries[rank_swiss2-1]
+            entry.corp_score1 = corp_score1
+            entry.runner_score1 = runner_score1
+            entry.corp_score2 = corp_score2
+            entry.runner_score2 = runner_score2
+            entry.table_type = table_type
+            ret.append(entry)
+        return ret
     
 class ABR:
     def __init__(self):
