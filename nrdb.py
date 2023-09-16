@@ -1,6 +1,7 @@
 from requests import cached_request
 import sqlite3
 import json
+import urllib.parse
 
 class Card:
     def __init__(self, id, name):
@@ -38,7 +39,7 @@ class NRDB:
 
     def __create_db(self):
         cur = self.con.cursor()
-        cur.execute("CREATE TABLE IF NOT EXISTS cards(id, name, type, faction, keywords, pack)")
+        cur.execute("CREATE TABLE IF NOT EXISTS cards(id, name, type, faction, keywords, pack, latest_printing)")
         cur.execute("CREATE TABLE IF NOT EXISTS decklists(id, name, cards_json)")
         cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_cards ON cards(id)")
 
@@ -54,10 +55,10 @@ class NRDB:
             faction = card_data['faction_code']
             keywords = card_data['keywords'] if 'keywords' in card_data else None
             pack = card_data['pack_code']
-            data.append((id, name, type, faction, keywords, pack))
+            data.append((id, name, type, faction, keywords, pack, None))
 
         cur = self.con.cursor()
-        cur.executemany("INSERT INTO cards VALUES (?, ?, ?, ?, ?, ?)", data)
+        cur.executemany("INSERT INTO cards VALUES (?, ?, ?, ?, ?, ?, ?)", data)
         self.con.commit()
         
         c = Card(id, name)
@@ -68,10 +69,12 @@ class NRDB:
     
     def get_card(self, id):
         cur = self.con.cursor()
-        res = cur.execute(f"SELECT name, type, faction, keywords, pack FROM cards WHERE id = {id}")
+        res = cur.execute(f"SELECT name, type, faction, keywords, pack, latest_printing FROM cards WHERE id = {id}")
         rows = res.fetchall()
         if rows:
             data = rows[0]
+            if data[5]:
+                return self.get_card(data[5])
             c = Card(id, data[0])
             c.type = data[1]
             c.faction = data[2]
@@ -111,9 +114,32 @@ class NRDB:
             return d
         return self.get_decklist_api(id)
 
+    def fix_cards_api3(self, higher_id):
+        cur = self.con.cursor()
+        res = cur.execute(f"SELECT id FROM cards WHERE id < {higher_id} AND latest_printing IS NULL")
+        latests = []
+        for (id,) in res:
+            old_card = self.get_card(id)
+            print(f"Looking for other printings for {old_card.name}")
+            card_name_safe = urllib.parse.quote(old_card.name)
+            card_search = cached_request(f"https://api-preview.netrunnerdb.com/api/v3/public/cards?filter[search]={card_name_safe}")
+            if card_search:
+                api3_id = card_search['data'][0]['id']
+                printings_data = cached_request(f"https://api-preview.netrunnerdb.com/api/v3/public/cards/{api3_id}/relationships/printings")
+                if printings_data:
+                    printings = []
+                    for p in printings_data['data']:
+                        printings.append(int(p['id']))
+                    latest = max(printings)
+                    if latest != id:
+                        latests.append((latest, id))
+        if latests:
+            cur.executemany("UPDATE cards SET latest_printing = ? WHERE id = ?", latests)
+            self.con.commit()
 
 if __name__ == "__main__":
-    test = NRDB()
-    print(test.get_card(26066))
-    print(test.get_decklist(77001))
-    print(test.get_decklist(77265))
+    nrdb = NRDB()
+    print(nrdb.get_card(26066))
+    print(nrdb.get_decklist(77001))
+    print(nrdb.get_decklist(77265))
+    #nrdb.fix_cards_api3(12000)
