@@ -6,8 +6,9 @@ from nrdb import NRDB
 cardpool = 'tai'
 
 abr = ABR()
-abr.get_tournaments_api('tai') # force a get from API
-tournaments = abr.get_tournaments('tai') # from DB
+#abr.get_tournaments_api('tai') # force a get from API
+# TODO fix cardpool in DB
+tournaments = abr.get_tournaments('The Automata Initiative', 'standard') # from DB
 
 card_ids = defaultdict(int)
 corp_ids = defaultdict(int)

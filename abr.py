@@ -237,9 +237,13 @@ class ABR:
         cur.executemany("INSERT INTO tournament_tables VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", insert)
         self.con.commit()
 
-    def get_tournaments(self, cardpool):
+    def get_tournaments(self, cardpool, format = None):
         cur = self.con.cursor()
-        res = cur.execute("SELECT id, name, updated_at FROM tournaments")
+        query = f"SELECT id, name, updated_at FROM tournaments card WHERE cardpool='{cardpool}'"
+        if format:
+            query += f" AND format = '{format}'"
+
+        res = cur.execute(query)
         ret = []
         now = int(time.time())
         ttl = 24 * 3600
