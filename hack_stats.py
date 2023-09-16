@@ -50,7 +50,7 @@ cycles = defaultdict(lambda: defaultdict(int))
 cycles_size = defaultdict(int)
 pack_url = 'https://netrunnerdb.com/api/2.0/public/pack/'
 for code in packs:
-    pack_json = cached_request(pack_url + code, f"packs/{code}")
+    pack_json = cached_request(pack_url + code)
     cycle_code = pack_json['data'][0]['cycle_code']
     pack_size = pack_json['data'][0]['size']
     cycles_size[cycle_code] += pack_size

@@ -44,7 +44,7 @@ class Tournament:
 
     def get_entries_api(self):
         url = f'https://alwaysberunning.net/api/entries?id={self.id}'
-        response = cached_request(url, f"tournament/{self.id}")
+        response = cached_request(url)
         
         if response is None:
             return
@@ -247,7 +247,7 @@ class ABR:
         return insert
     
     def get_matchdata_api(self, id):
-        data = cached_request(f'https://alwaysberunning.net/tjsons/{id}.json', f'matchdata/{id}')
+        data = cached_request(f'https://alwaysberunning.net/tjsons/{id}.json')
         if data == None:
             return
         

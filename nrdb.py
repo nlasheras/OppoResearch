@@ -45,7 +45,7 @@ class NRDB:
 
     def get_card_api(self, id):
         url = f'https://netrunnerdb.com/api/2.0/public/card/{id:05}'
-        response = cached_request(url, f"cards/{id}")
+        response = cached_request(url)
 
         data = []
         if response:
@@ -85,7 +85,7 @@ class NRDB:
     
     def get_decklist_api(self, id):
         url = f"https://netrunnerdb.com/api/2.0/public/decklist/{id}"
-        response = cached_request(url, f"decks/{id}")
+        response = cached_request(url)
 
         data = []
         if response:
@@ -122,10 +122,10 @@ class NRDB:
             old_card = self.get_card(id)
             print(f"Looking for other printings for {old_card.name}")
             card_name_safe = urllib.parse.quote(old_card.name)
-            card_search = cached_request(f"https://api-preview.netrunnerdb.com/api/v3/public/cards?filter[search]={card_name_safe}")
+            card_search = cached_request(f"https://api-preview.netrunnerdb.com/api/v3/public/cards?filter[search]={card_name_safe}", use_cache = False)
             if card_search:
                 api3_id = card_search['data'][0]['id']
-                printings_data = cached_request(f"https://api-preview.netrunnerdb.com/api/v3/public/cards/{api3_id}/relationships/printings")
+                printings_data = cached_request(f"https://api-preview.netrunnerdb.com/api/v3/public/cards/{api3_id}/relationships/printings", use_cache = False)
                 if printings_data:
                     printings = []
                     for p in printings_data['data']:
@@ -142,4 +142,4 @@ if __name__ == "__main__":
     print(nrdb.get_card(26066))
     print(nrdb.get_decklist(77001))
     print(nrdb.get_decklist(77265))
-    #nrdb.fix_cards_api3(12000)
+    nrdb.fix_cards_api3(12000)
