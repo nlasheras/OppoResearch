@@ -35,6 +35,9 @@ class Tournament:
         url = f'https://alwaysberunning.net/api/entries?id={self.id}'
         response = cached_request(url, f"tournament/{self.id}")
         
+        if response is None:
+            return
+        
         if 'warn' in response:
             print(response['warn'])
             return

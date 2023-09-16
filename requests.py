@@ -12,7 +12,12 @@ def cached_request(url, cache = None):
     if cache and path.exists(filename) and not global_ignore_cache:
         with open(filename) as f:
             return json.load(f)
-    response = urlopen(url)
+    try:
+        response = urlopen(url)
+    except Exception as e:
+        print(e)
+        return None
+
     data = json.loads(response.read())
     if cache:
         cache_path = cache.split("/")[:-1][0]
