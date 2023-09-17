@@ -6,7 +6,7 @@ from nrdb import NRDB
 cardpool = 'tai'
 
 abr = ABR()
-#abr.get_tournaments_api('tai') # force a get from API
+abr.get_tournaments_api('tai') # force a get from API
 # TODO fix cardpool in DB
 tournaments = abr.get_tournaments('The Automata Initiative', 'standard') # from DB
 
@@ -14,7 +14,7 @@ ids_played = defaultdict(int)
 ids_wins = defaultdict(int)
 cards_played = defaultdict(int)
 cards_wins = defaultdict(int)
-
+ 
 for tournament in tournaments:
     for table in tournament.all_tables():
         def count_deck(id, deck, score):

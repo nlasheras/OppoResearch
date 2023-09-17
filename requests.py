@@ -13,8 +13,13 @@ def __get_cache_path(url):
     if 'netrunnerdb.com' in cache_path:
         cache_path = cache_path.replace('api/2.0/public/', '')
         cache_path = cache_path.replace('api/v3/public/', '')
+    if 'alwaysberunning.net' in cache_path:
+        cache_path = cache_path.replace('api/', '')
+        cache_path = cache_path.replace('?id=', '/')
+        cache_path = cache_path.replace('?cardpool=', '/')
+        cache_path = cache_path.replace('&limit=100', '')
     return cache_path
- 
+
 def __get_expiration_time(url):
     if 'netrunnerdb.com' in url:
         return 30 * 24 * 3600 
@@ -28,8 +33,6 @@ def cached_request(url, use_cache = True):
     if use_cache and path.exists(filename) and not global_ignore_cache:
         mtime = path.getmtime(filename)
         now = int(time.time())
-        elapsed = now - mtime
-        print(f"elapsed {filename} = {elapsed}")
         if now - mtime < __get_expiration_time(url):
             with open(filename) as f:
                 return json.load(f)

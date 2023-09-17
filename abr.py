@@ -114,6 +114,8 @@ class Tournament:
         entries = self.__entries(False)
         res = cur.execute(query)
         ret = []
+        if not entries:
+            return []
         for (round, table_idx, rank_swiss1, corp_score1, runner_score1, rank_swiss2, corp_score2, runner_score2, table_type) in res:
             if rank_swiss1 == None or rank_swiss2 == None:
                 continue
@@ -149,7 +151,6 @@ class ABR:
         cur = self.con.cursor()
 
         insert = []
-        now = int(time.time())
         for tournament in response:
             if not tournament['concluded']:
                 continue
@@ -157,7 +158,7 @@ class ABR:
 
             if cur.execute(f"SELECT id FROM tournaments WHERE id = {tournament_id}").fetchall():
                 continue
-            insert.append((tournament_id, tournament['title'], tournament['format'], tournament['cardpool'], tournament['mwl'], now))
+            insert.append((tournament_id, tournament['title'], tournament['format'], tournament['cardpool'], tournament['mwl'], 0))
 
             if tournament['matchdata']:
                 self.get_matchdata_api(tournament_id)
