@@ -211,10 +211,17 @@ class ABR:
                         corp2_score = 0 if is_corp1 else 1
                         runner2_score = 1 if is_corp1 else 0
                 else:
-                    runner1_score = 1 if table_data['player1']['runnerScore'] > 0 else 0
-                    runner2_score = 1 if table_data['player2']['runnerScore'] > 0 else 0
-                    corp1_score = 1 if table_data['player1']['corpScore'] > 0 else 0
-                    corp2_score = 1 if table_data['player2']['corpScore'] > 0 else 0
+                    def get(player, score):
+                        value = table_data[player][score]
+                        return 1 if value and value > 0 else 0
+                    runner1_score = get('player1','runnerScore') 
+                    runner2_score = get('player2','runnerScore') 
+                    corp1_score = get('player1','corpScore')
+                    corp2_score = get('player2','corpScore')
+
+                    if runner1_score + runner2_score + corp1_score + corp2_score == 0:
+                        print(f"Weird score in table {round_idx}.{table_idx} for tourney {id}")
+                        continue
 
                 insert.append((id, round_idx, table_idx, r1, corp1_score, runner1_score, r2, corp2_score, runner2_score, table_type))
         return insert
@@ -268,11 +275,13 @@ class ABR:
         cur.executemany("INSERT INTO tournament_tables VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", insert)
         self.con.commit()
 
-    def get_tournaments(self, cardpool, format = None):
+    def get_tournaments(self, cardpool, format = None, banlist = None):
         cur = self.con.cursor()
         query = f"SELECT id, name, updated_at FROM tournaments card WHERE cardpool='{cardpool}'"
         if format:
             query += f" AND format = '{format}'"
+        if banlist:
+            query += f" AND banlist LIKE '%{banlist}'"
 
         res = cur.execute(query)
         ret = []
