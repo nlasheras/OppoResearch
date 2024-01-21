@@ -5,10 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: hack_stats.py",
+            "name": "hack_stats.py",
             "type": "python",
             "request": "launch",
             "program": "hack_stats.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Update from APIs",
+            "type": "python",
+            "request": "launch",
+            "program": "update_from_api.py",
             "console": "integratedTerminal",
             "justMyCode": true
         },
@@ -19,6 +27,6 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
-        }
+        },
     ]
 }

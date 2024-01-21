@@ -73,10 +73,13 @@ class Tournament:
         
         if len(insert) > 0:
             cur.executemany("INSERT INTO tournament_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?)", insert)
+            print(f"Inserting {len(insert)} new tournament claims into DB")
         if len(update) > 0:
             cur.executemany("UPDATE tournament_entries SET user_name = ?, corp_id = ?, corp_deck = ?, runner_id = ?, runner_deck = ? WHERE tournament_id = ? AND rank_swiss = ?", update)
+            print(f"Updating {len(update)} tournament claims from DB")
         now = int(time.time())
         cur.execute("UPDATE tournaments SET updated_at = ? WHERE id = ?", (now, self.id))
+
         self.__abr.con.commit()
 
     def __entries(self, top_cut_only):
@@ -117,7 +120,7 @@ class Tournament:
         if not entries:
             return []
         for (round, table_idx, rank_swiss1, corp_score1, runner_score1, rank_swiss2, corp_score2, runner_score2, table_type) in res:
-            if rank_swiss1 == None or rank_swiss2 == None:
+            if rank_swiss1 == None or rank_swiss2 == None or rank_swiss1 > len(entries) or rank_swiss2 > len(entries):
                 continue
             entry = Table(self)
             entry.player1 = entries[rank_swiss1-1]
@@ -141,7 +144,7 @@ class ABR:
         cur = self.con.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS tournaments(id, name, format, cardpool, banlist, updated_at)")
         cur.execute("CREATE TABLE IF NOT EXISTS tournament_entries(tournament_id, rank_swiss, rank_top, user_name, corp_id, corp_deck, runner_id, runner_deck)")
-        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tournament_entries ON tournament_entries(tournament_id, rank_swiss)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tournament_entries ON tournament_entries(tournament_id, rank_swiss)")
         cur.execute("CREATE TABLE IF NOT EXISTS tournament_tables(tournament_id, round, table_idx, rank_swiss1, corp_score1, runner_score1, rank_swiss2, corp_score2, runner_score2, table_type)")
 
     def get_tournaments_api(self, cardpool):
@@ -158,12 +161,18 @@ class ABR:
 
             if cur.execute(f"SELECT id FROM tournaments WHERE id = {tournament_id}").fetchall():
                 continue
-            insert.append((tournament_id, tournament['title'], tournament['format'], tournament['cardpool'], tournament['mwl'], 0))
+            name = tournament['title']
+            insert.append((tournament_id, name, tournament['format'], tournament['cardpool'], tournament['mwl'], 0))
+
+            t = Tournament(self, tournament_id, name)
+            print(f"Fetching entries for {name}...")
+            t.get_entries_api()
 
             if tournament['matchdata']:
                 self.get_matchdata_api(tournament_id)
 
         cur.executemany("INSERT INTO tournaments VALUES (?, ?, ?, ?, ?, ?)", insert)
+        print(f"Inserted {len(insert)} new tournaments into DB")
 
         self.con.commit()
 
@@ -220,7 +229,7 @@ class ABR:
                     corp2_score = get('player2','corpScore')
 
                     if runner1_score + runner2_score + corp1_score + corp2_score == 0:
-                        print(f"Weird score in table {round_idx}.{table_idx} for tourney {id}")
+                        #print(f"Weird score in table {round_idx}.{table_idx} for tournanment {id}")
                         continue
 
                 insert.append((id, round_idx, table_idx, r1, corp1_score, runner1_score, r2, corp2_score, runner2_score, table_type))
@@ -298,8 +307,6 @@ class ABR:
 
 if __name__ == "__main__":
     abr = ABR()
-    #abr.get_tournaments_api('tai')
     ts = abr.get_tournaments('tai')
     emea = Tournament(abr, 3779, '2023 EMEA Continentals')
-    #emea.get_entries_api()
     print(emea.top_cut())
