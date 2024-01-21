@@ -7,7 +7,7 @@ import csv
 cardpool = 'tai'
 
 abr = ABR()
-tournaments = abr.get_tournaments('The Automata Initiative', format='standard', start_date='2023-12-01')
+tournaments = abr.get_tournaments('The Automata Initiative', format='standard', start_date='2023-11-21')
 
 ids_played = defaultdict(int)
 ids_wins = defaultdict(int)
@@ -81,21 +81,27 @@ for code in sorted_cycles:
             for (name, count) in cards:
                 writer.writerow([name, count])
 
-if False: # Disable ICE stats for now
-    used_ice = defaultdict(int)
-    ice_keywords = defaultdict(int)
+def print_most_used(type = None, keyword = None, count = 10):
+    used = defaultdict(int)
+    keywords = defaultdict(int)
     for id in cards_played: 
         card = nrdb.get_card(id)
-        if card.type == 'ice':
-            used_ice[id] += cards_played[id]
-            keywords = card.keywords.split(" - ")
-            for k in keywords:
-                ice_keywords[k] += cards_played[id]
+        card_keywords = card.keywords.split(" - ") if card.keywords else []
+        if (type != None and card.type == type) or (keyword != None and keyword in card_keywords):
+            used[id] += cards_played[id]
+            for k in card_keywords:
+                keywords[k] += cards_played[id]
 
-    for id in sorted(used_ice.keys(), key=lambda k: used_ice[k], reverse=True):
+    for (pos,id) in enumerate(sorted(used.keys(), key=lambda k: used[k], reverse=True)):
         card = nrdb.get_card(id)
-        print(f'{card.name},{card.keywords},{used_ice[id]}')
-    for k in sorted(ice_keywords.keys(), key=lambda k: ice_keywords[k], reverse=True):
-        print(f'{k},{ice_keywords[k]}')
+        if pos < count:
+            print(f'{card.name} {card.keywords} ({used[id]})')
 
 
+print("*** Most used ICE")
+print_most_used(type = 'ice')
+
+print("*** Most used Breakers")
+print_most_used(keyword = 'Fracter', count=3)
+print_most_used(keyword = 'Decoder', count=3)
+print_most_used(keyword = 'Killer', count=3)
