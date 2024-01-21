@@ -142,7 +142,7 @@ class ABR:
 
     def __create_db(self):
         cur = self.con.cursor()
-        cur.execute("CREATE TABLE IF NOT EXISTS tournaments(id, name, format, cardpool, banlist, updated_at)")
+        cur.execute("CREATE TABLE IF NOT EXISTS tournaments(id, name, format, cardpool, banlist, end_date, updated_at)")
         cur.execute("CREATE TABLE IF NOT EXISTS tournament_entries(tournament_id, rank_swiss, rank_top, user_name, corp_id, corp_deck, runner_id, runner_deck)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tournament_entries ON tournament_entries(tournament_id, rank_swiss)")
         cur.execute("CREATE TABLE IF NOT EXISTS tournament_tables(tournament_id, round, table_idx, rank_swiss1, corp_score1, runner_score1, rank_swiss2, corp_score2, runner_score2, table_type)")
@@ -162,7 +162,11 @@ class ABR:
             if cur.execute(f"SELECT id FROM tournaments WHERE id = {tournament_id}").fetchall():
                 continue
             name = tournament['title']
-            insert.append((tournament_id, name, tournament['format'], tournament['cardpool'], tournament['mwl'], 0))
+            date = tournament['date'] if 'date' in tournament else None
+            if date == None and 'end_date' in tournament:
+                date = tournament['end_date']
+            date = date[:-1].replace('.', '-')
+            insert.append((tournament_id, name, tournament['format'], tournament['cardpool'], tournament['mwl'], date, 0))
 
             t = Tournament(self, tournament_id, name)
             print(f"Fetching entries for {name}...")
@@ -171,7 +175,7 @@ class ABR:
             if tournament['matchdata']:
                 self.get_matchdata_api(tournament_id)
 
-        cur.executemany("INSERT INTO tournaments VALUES (?, ?, ?, ?, ?, ?)", insert)
+        cur.executemany("INSERT INTO tournaments VALUES (?, ?, ?, ?, ?, ?, ?)", insert)
         print(f"Inserted {len(insert)} new tournaments into DB")
 
         self.con.commit()
@@ -284,13 +288,16 @@ class ABR:
         cur.executemany("INSERT INTO tournament_tables VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", insert)
         self.con.commit()
 
-    def get_tournaments(self, cardpool, format = None, banlist = None):
+    def get_tournaments(self, cardpool, format = None, banlist = None, start_date = None):
         cur = self.con.cursor()
         query = f"SELECT id, name, updated_at FROM tournaments card WHERE cardpool='{cardpool}'"
         if format:
             query += f" AND format = '{format}'"
         if banlist:
             query += f" AND banlist LIKE '%{banlist}'"
+        if start_date:
+            query += f" AND end_date > '{start_date}'"
+
 
         res = cur.execute(query)
         ret = []
