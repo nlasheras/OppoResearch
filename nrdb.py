@@ -114,11 +114,26 @@ class NRDB:
             return d
         return self.get_decklist_api(id)
 
-    def fix_cards_api3(self, higher_id):
+    def fix_cards_api3_old_packs(self, higher_id = 12000):
         cur = self.con.cursor()
         res = cur.execute(f"SELECT id FROM cards WHERE id < {higher_id} AND latest_printing IS NULL")
-        latests = []
+        ids = []
         for (id,) in res:
+            ids.append(id)
+        self.___fix_cards_api3(ids)
+
+    def fix_cards_api3_by_name(self, name):
+        cur = self.con.cursor()
+        res = cur.execute(f"SELECT id FROM cards WHERE name == '{name}' AND latest_printing IS NULL")
+        ids = []
+        for (id,) in res:
+            ids.append(id)
+        self.___fix_cards_api3(ids)
+
+    def ___fix_cards_api3(self, card_ids):
+        cur = self.con.cursor()
+        latests = []
+        for id in card_ids:
             old_card = self.get_card(id)
             print(f"Looking for other printings for {old_card.name}")
             card_name_safe = urllib.parse.quote(old_card.name)
@@ -142,4 +157,6 @@ if __name__ == "__main__":
     print(nrdb.get_card(26066))
     print(nrdb.get_decklist(77001))
     print(nrdb.get_decklist(77265))
-    nrdb.fix_cards_api3(12000)
+    nrdb.fix_cards_api3_old_packs()
+    nrdb.fix_cards_api3_by_name('Hortum')
+    nrdb.fix_cards_api3_by_name('Marilyn Campaign')
