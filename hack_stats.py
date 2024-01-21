@@ -3,6 +3,8 @@ from requests import cached_request
 from abr import ABR
 from nrdb import NRDB
 import csv
+from os import makedirs
+from os import path
 
 cardpool = 'tai'
 
@@ -14,7 +16,6 @@ ids_wins = defaultdict(int)
 cards_played = defaultdict(int)
 cards_wins = defaultdict(int)
  
-print(f'Checking data from {len(tournaments)} tournaments...')
 for tournament in tournaments:
     for table in tournament.all_tables():
         def count_deck(id, deck, score):
@@ -35,7 +36,9 @@ for tournament in tournaments:
 
 print("*** Most played IDs")
 nrdb = NRDB()
-with open('ids.csv', 'w', newline='', encoding='utf-8') as csvfile:
+if not path.exists('output'):
+    makedirs('output')
+with open('output/ids.csv', 'w', newline='', encoding='utf-8') as csvfile:
     writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     for (pos, id) in enumerate(sorted(ids_played, key = lambda id: ids_played[id], reverse = True), 0):
         name = nrdb.get_card(id).name
@@ -76,7 +79,7 @@ for code in sorted_cycles:
         cards = list(map(lambda name: (name, cycle_cards[name]), cycle_cards))
         cards.sort(reverse = True, key = lambda x: x[1])
 
-        with open(code + '.csv', 'w', newline='', encoding='utf-8') as csvfile:
+        with open('output/' + code + '.csv', 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             for (name, count) in cards:
                 writer.writerow([name, count])
