@@ -87,21 +87,23 @@ class NRDB:
         url = f"https://netrunnerdb.com/api/2.0/public/decklist/{id}"
         response = cached_request(url)
 
-        data = []
-        if response:
+        if response and response['success'] == True:
+            data = []
             list_data = response['data'][0]
             name = list_data['name']
             cards = list_data['cards']
             cards_json = json.dumps(cards)
             data.append((id, name, cards_json))
 
-        cur = self.con.cursor()
-        cur.executemany("INSERT INTO decklists VALUES (?, ?, ?)", data)
-        self.con.commit()
+            cur = self.con.cursor()
+            cur.executemany("INSERT INTO decklists VALUES (?, ?, ?)", data)
+            self.con.commit()
         
-        d = Decklist(id, name)
-        d.load_cards(self, cards_json)
-        return d
+            d = Decklist(id, name)
+            d.load_cards(self, cards_json)
+            return d
+    
+        return None
 
     def get_decklist(self, id):
         cur = self.con.cursor()

@@ -7,13 +7,14 @@ import csv
 cardpool = 'tai'
 
 abr = ABR()
-tournaments = abr.get_tournaments('The Automata Initiative', format='standard', banlist='23.09') # from DB
+tournaments = abr.get_tournaments('The Automata Initiative', format='standard', start_date='2023-12-01')
 
 ids_played = defaultdict(int)
 ids_wins = defaultdict(int)
 cards_played = defaultdict(int)
 cards_wins = defaultdict(int)
  
+print(f'Checking data from {len(tournaments)} tournaments...')
 for tournament in tournaments:
     for table in tournament.all_tables():
         def count_deck(id, deck, score):
@@ -32,15 +33,25 @@ for tournament in tournaments:
         count_deck(table.player2.runner_id, table.player2.runner_deck, table.runner_score2)
 
 
+print("*** Most played IDs")
 nrdb = NRDB()
 with open('ids.csv', 'w', newline='', encoding='utf-8') as csvfile:
     writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-    for id in sorted(ids_played, key = lambda id: ids_played[id], reverse = True):
+    for (pos, id) in enumerate(sorted(ids_played, key = lambda id: ids_played[id], reverse = True), 0):
         name = nrdb.get_card(id).name
         win_rate = int(ids_wins[id] * 100 / ids_played[id])
         writer.writerow([name, ids_played[id],win_rate])
+        if pos < 10:
+            print(f"{name}: {ids_played[id]}")
 
-print("*** Check pack and cycle usage")
+print("*** Higher win-rate IDs")
+for (pos, id) in enumerate(sorted(ids_played, key = lambda id: ids_wins[id] / ids_played[id], reverse = True), 0):
+    name = nrdb.get_card(id).name
+    win_rate = int(ids_wins[id] * 100 / ids_played[id])
+    if win_rate > 50:
+        print(f"{name}: {ids_wins[id]}/{ids_played[id]} {win_rate}%")
+
+print("*** Pack and cycle usage")
 packs = defaultdict(lambda: defaultdict(int))
 for id in cards_played: 
     card = nrdb.get_card(id)
@@ -57,7 +68,6 @@ for code in packs:
     for name in packs[code]:
         cycles[cycle_code][name] += packs[code][name]
 
-print("*** RESULTS ***")
 sorted_cycles = sorted(cycles.keys(), key=lambda k: len(cycles[k]) / cycles_size[k], reverse=True)
 for code in sorted_cycles:
     cycle_cards = cycles[code]
