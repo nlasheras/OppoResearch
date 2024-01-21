@@ -7,9 +7,6 @@ import csv
 cardpool = 'tai'
 
 abr = ABR()
-abr.get_tournaments_api('tai') # force a get from API
-# TODO fix cardpool in DB
-#tournaments = abr.get_tournaments('The Automata Initiative', format='standard', banlist='23.09') # from DB
 tournaments = abr.get_tournaments('The Automata Initiative', format='standard', banlist='23.09') # from DB
 
 ids_played = defaultdict(int)
