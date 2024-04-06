@@ -1,5 +1,5 @@
 from abr import ABR
 
-cardpool = 'tai'
+cardpool = 'rwr'
 abr = ABR()
 abr.get_tournaments_api(cardpool) 

@@ -6,16 +6,17 @@ import csv
 from os import makedirs
 from os import path
 
-cardpool = 'tai'
+cardpool = 'rwr'
 
 abr = ABR()
-tournaments = abr.get_tournaments('The Automata Initiative', format='standard', start_date='2023-11-21')
+tournaments = abr.get_tournaments('Rebellion Without Rehearsal', format='standard', start_date='2024-03-18')
 
 ids_played = defaultdict(int)
 ids_wins = defaultdict(int)
 cards_played = defaultdict(int)
 cards_wins = defaultdict(int)
  
+only_top = False
 for tournament in tournaments:
     for table in tournament.all_tables():
         def count_deck(id, deck, score):
@@ -28,10 +29,12 @@ for tournament in tournaments:
                     cards_played[card.id] += 1
                     cards_wins[card.id] += win
 
-        count_deck(table.player1.corp_id, table.player1.corp_deck, table.corp_score1)
-        count_deck(table.player1.runner_id, table.player1.runner_deck, table.runner_score1)
-        count_deck(table.player2.corp_id, table.player2.corp_deck, table.corp_score2)
-        count_deck(table.player2.runner_id, table.player2.runner_deck, table.runner_score2)
+        if only_top == False or table.player1.rank_top:
+            count_deck(table.player1.corp_id, table.player1.corp_deck, table.corp_score1)
+            count_deck(table.player1.runner_id, table.player1.runner_deck, table.runner_score1)
+        if only_top == False or table.player2.rank_top:
+            count_deck(table.player2.corp_id, table.player2.corp_deck, table.corp_score2)
+            count_deck(table.player2.runner_id, table.player2.runner_deck, table.runner_score2)
 
 
 print("*** Most played IDs")
@@ -102,7 +105,10 @@ def print_most_used(type = None, keyword = None, count = 10):
 
 
 print("*** Most used ICE")
-print_most_used(type = 'ice')
+#print_most_used(type = 'ice')
+print_most_used(keyword = 'Barrier')
+print_most_used(keyword = 'Sentry')
+print_most_used(keyword = 'Code Gate')
 
 print("*** Most used Breakers")
 print_most_used(keyword = 'Fracter', count=3)
