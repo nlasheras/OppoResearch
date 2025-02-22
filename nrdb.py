@@ -141,15 +141,9 @@ class NRDB:
             card_name_safe = urllib.parse.quote(old_card.name)
             card_search = cached_request(f"https://api-preview.netrunnerdb.com/api/v3/public/cards?filter[search]={card_name_safe}", use_cache = False)
             if card_search:
-                api3_id = card_search['data'][0]['id']
-                printings_data = cached_request(f"https://api-preview.netrunnerdb.com/api/v3/public/cards/{api3_id}/relationships/printings", use_cache = False)
-                if printings_data:
-                    printings = []
-                    for p in printings_data['data']:
-                        printings.append(int(p['id']))
-                    latest = max(printings)
-                    if latest != id:
-                        latests.append((latest, id))
+                latest = int(card_search['data'][0]['attributes']['latest_printing_id'])
+                if latest != id:
+                    latests.append((latest, id))
         if latests:
             cur.executemany("UPDATE cards SET latest_printing = ? WHERE id = ?", latests)
             self.con.commit()
@@ -160,5 +154,6 @@ if __name__ == "__main__":
     print(nrdb.get_decklist(77001))
     print(nrdb.get_decklist(77265))
     nrdb.fix_cards_api3_old_packs()
-    nrdb.fix_cards_api3_by_name('Hortum')
-    nrdb.fix_cards_api3_by_name('Marilyn Campaign')
+    #nrdb.fix_cards_api3_by_name('Hortum')
+    #nrdb.fix_cards_api3_by_name('Marilyn Campaign')
+    #nrdb.fix_cards_api3_by_name('Timely Public Release')
