@@ -9,14 +9,14 @@ from os import path
 cardpool = 'rwr'
 
 abr = ABR()
-tournaments = abr.get_tournaments('Rebellion Without Rehearsal', format='standard', start_date='2024-03-18')
+tournaments = abr.get_tournaments('Rebellion Without Rehearsal', format='standard', start_date='2024-12-26')
 
 ids_played = defaultdict(int)
 ids_wins = defaultdict(int)
 cards_played = defaultdict(int)
 cards_wins = defaultdict(int)
  
-only_top = False
+only_top = True
 for tournament in tournaments:
     for table in tournament.all_tables():
         def count_deck(id, deck, score):
@@ -75,10 +75,14 @@ for code in packs:
         cycles[cycle_code][name] += packs[code][name]
 
 sorted_cycles = sorted(cycles.keys(), key=lambda k: len(cycles[k]) / cycles_size[k], reverse=True)
+rotated_cards = []
 for code in sorted_cycles:
     cycle_cards = cycles[code]
     print(f"{code} {len(cycle_cards)}/{cycles_size[code]}")
-    if True: #code in ['red-sand', 'kitara', 'reign-and-reverie', 'magnum-opus-reprint']:
+    if code in ['red-sand', 'kitara', 'reign-and-reverie', 'magnum-opus-reprint', 'system-update-2021' ]:
+        cards = list(map(lambda name: (name, cycle_cards[name], code), cycle_cards))
+        rotated_cards += cards
+    if True:
         cards = list(map(lambda name: (name, cycle_cards[name]), cycle_cards))
         cards.sort(reverse = True, key = lambda x: x[1])
 
@@ -86,6 +90,12 @@ for code in sorted_cycles:
             writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             for (name, count) in cards:
                 writer.writerow([name, count])
+
+rotated_cards.sort(reverse = True, key = lambda x: x[1])
+with open('output/dawn_rotation.csv', 'w', newline='', encoding='utf-8') as csvfile:
+    writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+    for (name, count, code) in rotated_cards:
+        writer.writerow([name, code, count])
 
 def print_most_used(type = None, keyword = None, count = 10):
     used = defaultdict(int)
